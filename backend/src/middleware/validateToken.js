@@ -42,7 +42,7 @@ export const checkAndRenewToken = async (req, res, next) => {
         userId = decoded.access2;
 
         const userResult = await pool.query(
-          "SELECT id, user_name FROM users WHERE id = $1",
+          "SELECT id, name, role FROM users WHERE id = $1",
           [userId]
         );
         const user = userResult.rows[0];
@@ -51,15 +51,15 @@ export const checkAndRenewToken = async (req, res, next) => {
         }
 
         const newAccessToken = jwt.sign(
-          { access1: user.username, access2: user.id },
+          { access1: user.name, access2: user.id, access3: user.role },
           process.env.ACCESS_TOKEN_SECRET,
-          { expiresIn: "15m" }
+          { expiresIn: "10m" }
         );
 
         res.cookie("Juice", newAccessToken, {
           httpOnly: true,
           sameSite: "strict",
-          secure: process.env.NODE_ENV === "production",
+          // secure: process.env.NODE_ENV === "production",
           maxAge: 15 * 60 * 1000,
         });
 
@@ -73,7 +73,7 @@ export const checkAndRenewToken = async (req, res, next) => {
 
     if (userId) {
       const userResult = await pool.query(
-        "SELECT  user_name, email, id FROM users WHERE id = $1",
+        "SELECT name, email, id, role FROM users WHERE id = $1",
         [userId]
       );
       const user = userResult.rows[0];

@@ -4,53 +4,61 @@ import { validateUserInput } from "../utils/validator.js";
 import jwt from "jsonwebtoken";
 
 export const signup = async (req, res) => {
-  const { user_name, email, password } = req.body;
+  const { name, email, password } = req.body;
 
   try {
-    if (!user_name || !email || !password) {
+    if (!name || !email || !password) {
       return res.status(400).json({
-        message: "all field must be entered!",
+        message: "All fields must be entered!",
       });
     }
 
-    const existingUser = await pool.query(
-      "SELECT * FROM users WHERE email = $1",
+    const existingUserResult = await pool.query(
+      "SELECT EXISTS (SELECT 1 FROM users WHERE email = $1)",
       [email]
     );
-    console.log("this is the exiting user-->", existingUser.rows[0]);
-    if (existingUser.rows.length > 0) {
-      return res.status(400).json({ message: "Email already exists" });
+
+    if (existingUserResult.rows[0].exists) {
+      return res.status(400).json({
+        message: "Email already exists",
+      });
     }
 
-    const { error, value } = validateUserInput({
-      user_name,
-      email,
-      password,
-    });
-
+    const { error, value } = validateUserInput({ name, email, password });
     if (error) {
       const errorMessages = error.details.map((err) => err.message);
+      return res.status(400).json({
+        message: "Validation errors",
+        errors: errorMessages,
+      });
     }
-    console.log("this are the valid values", value);
+
+    const role = name.trim().toLowerCase() === "admin" ? "Admin" : "user";
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const newUser = await pool.query(
-      "INSERT INTO users (user_name, email, password) VALUES ($1, $2, $3) RETURNING *",
-      [user_name, email, hashedPassword]
+    const newUserResult = await pool.query(
+      "INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING *",
+      [name, email, hashedPassword, role]
     );
 
-    return res
-      .status(201)
-      .json({ message: "User registered successfully", user: newUser.rows[0] });
+    const newUser = newUserResult.rows[0];
+
+    return res.status(201).json({
+      message: "User registered successfully",
+      user: newUser,
+    });
   } catch (error) {
-    return res.status(500).json({ message: "Internal server error" });
+    console.error("Signup error:", error.message);
+    return res.status(500).json({
+      message: "Internal server error",
+    });
   }
 };
 
 export const login = async (req, res) => {
   const { email, password } = req.body;
 
-  // valida user input
   if (!email || !password) {
     return res.status(400).json({
       message: "all field must be entered!",
@@ -60,12 +68,15 @@ export const login = async (req, res) => {
 
   if (error) {
     const errorMessages = error.details.map((err) => err.message);
+    return res.status(400).json({
+      message: "Validation errors",
+      errors: errorMessages,
+    });
   }
-  console.log("this are the valid values", value);
 
   try {
     const result = await pool.query(
-      "SELECT id, user_name, email, password FROM users WHERE email = $1",
+      "SELECT id, name, email, password, role FROM users WHERE email = $1",
       [email]
     );
 
@@ -77,7 +88,6 @@ export const login = async (req, res) => {
     }
 
     const user = result.rows[0];
-    console.log("this is the valid user -->", user);
 
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
@@ -91,6 +101,7 @@ export const login = async (req, res) => {
       {
         access1: user.name,
         access2: user.id,
+        access3: user.role,
       },
       process.env.ACCESS_TOKEN_SECRET,
       {
@@ -102,6 +113,7 @@ export const login = async (req, res) => {
       {
         access1: user.name,
         access2: user.id,
+        access3: user.role,
       },
       process.env.REFRESH_TOKEN_SECRET,
       {
@@ -125,11 +137,7 @@ export const login = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "user logged in successfully",
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-      },
+      user: user,
     });
   } catch (error) {
     console.error("Login error:", error);
@@ -161,5 +169,3 @@ export const validateToken = (req, res) => {
     authUser: authUser,
   });
 };
-
-//Google authentication

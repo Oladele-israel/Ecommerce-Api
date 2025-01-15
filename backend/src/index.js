@@ -4,6 +4,7 @@ import "dotenv/config";
 import cors from "cors";
 import helmet from "helmet";
 import userRouter from "./Routes/user.routes.js";
+import productRouter from "./Routes/product.routes.js";
 import cookieParser from "cookie-parser";
 
 const app = express();
@@ -31,6 +32,7 @@ app.get("/", (req, res) => {
 });
 
 app.use("/user", userRouter);
+app.use("/product", productRouter);
 
 app.use((req, res, next) => {
   res.status(404).json({ error: "Route not found" });
