@@ -1,14 +1,13 @@
 import multer from "multer";
 
-const storage = multer.memoryStorage(); // Store the file in memory (buffer)
+const storage = multer.memoryStorage();
 const upload = multer({
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB size limit
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (!file.mimetype.startsWith("image/")) {
       return cb(new Error("Only image files are allowed!"), false);
     }
     cb(null, true);
   },
-}).single("image"); // 'image' is the field name that will be used in Postman
-
+}).single("image");
 export default upload;
